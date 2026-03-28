@@ -1,0 +1,3 @@
+# This directory is populated by go-jet code generation.
+# Run: ./commands.sh migration:up
+# Generated path: generated/db/<database_name>/public/{model,table,enum}/

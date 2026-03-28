@@ -1,0 +1,65 @@
+volumes:
+  pgdata_myapp:
+  go_mod_cache:
+
+services:
+  myapp-db:
+    image: postgres:17
+    container_name: myapp-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: myapp_user
+      POSTGRES_PASSWORD: myapp_password
+      POSTGRES_DB: myapp_db
+    volumes:
+      - pgdata_myapp:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myapp_user -d myapp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  myapp-backend:
+    image: golang:1.25
+    container_name: myapp-backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - go_mod_cache:/go/pkg/mod
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://myapp_user:myapp_password@myapp-db:5432/myapp_db?sslmode=disable
+      JWT_SECRET: change-me-to-a-long-random-secret
+      APP_ENV: development
+      GOMODCACHE: /go/pkg/mod
+    depends_on:
+      myapp-db:
+        condition: service_healthy
+    # On startup: run goose migrations, regenerate go-jet models, then serve.
+    # Generated files land in ./backend/generated/db (mounted volume).
+    command: >
+      sh -c "
+        go tool goose -dir db/migrations postgres \"$$DATABASE_URL\" up &&
+        go tool jet -dsn=\"$$DATABASE_URL\" -schema=public -path=./generated/db &&
+        go tool air
+      "
+
+  myapp-frontend:
+    image: node:22
+    container_name: myapp-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      # Vite dev server proxies /api to myapp-backend:8080 inside Docker.
+      # The browser talks to localhost:5173 only.
+      VITE_BACKEND_URL: http://myapp-backend:8080
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - myapp-backend

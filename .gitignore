@@ -1,0 +1,20 @@
+# Environment
+.env.local
+.env.*.local
+
+# Go
+backend/vendor/
+backend/tmp/
+backend/main
+
+# Go-jet and oapi-codegen generated output
+# Commit these if you want generated code in source control,
+# or keep them gitignored and regenerate on CI.
+# backend/generated/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Docker
+*.log
